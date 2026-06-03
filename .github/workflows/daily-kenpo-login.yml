@@ -16,28 +16,40 @@ jobs:
           KENPO_PWD: ${{ secrets.KENPO_PWD }}
         run: |
           python3 - <<'EOF'
-          import os, sys
+          import os, sys, re
           import requests
 
           base_url = "https://dk.kenpo.gr.jp/portal"
+          headers = {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          }
           session = requests.Session()
+          session.headers.update(headers)
 
           # セッションクッキーを取得
-          session.get(f"{base_url}/login.asp")
+          login_page = session.get(f"{base_url}/login.asp")
+          print(f"GET login.asp: {login_page.status_code}")
 
-          # ログイン POST
+          # ログイン POST（Referer付き）
           resp = session.post(f"{base_url}/auth.asp", data={
               "NO":    os.environ["KENPO_NO"],
               "ID":    os.environ["KENPO_ID"],
               "PWD":   os.environ["KENPO_PWD"],
               "login": "ログイン",
-          }, allow_redirects=True)
+          }, headers={"Referer": f"{base_url}/login.asp"},
+          allow_redirects=True)
 
           print(f"HTTP status: {resp.status_code}")
           print(f"Final URL:   {resp.url}")
 
+          # エラーメッセージをページから抽出（認証情報確認用）
+          text = resp.content.decode("shift-jis", errors="replace")
+          error_matches = re.findall(r'(?:エラー|error|失敗|invalid|incorrect|wrong)[^\n<]{0,80}', text, re.IGNORECASE)
+          for m in error_matches[:5]:
+              print(f"Page message: {m.strip()}")
+
           if "login.asp" in resp.url:
-              print("::error::Login failed – redirected back to login page")
+              print("::error::Login failed – redirected back to login page (check credentials)")
               sys.exit(1)
 
           if resp.status_code != 200:
