@@ -27,7 +27,7 @@ jobs:
             --data-urlencode "NO=${KENPO_NO}" \
             --data-urlencode "ID=${KENPO_ID}" \
             --data-urlencode "PWD=${KENPO_PWD}" \
-            -d "login=%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3" \
+            --data-urlencode "login=ログイン" \
             -L \
             -o /dev/null \
             -w "%{http_code} %{url_effective}")
