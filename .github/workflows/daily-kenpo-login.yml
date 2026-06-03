@@ -58,8 +58,12 @@ jobs:
               print(f"::error::Login failed – HTTP {resp.status_code}")
               sys.exit(1)
 
-          # 今月のログイン回数を抽出
-          m = re.search(r'今月ログイン(\d+)回目', text)
+          # 今月のログイン回数を抽出（デバッグ: 周辺テキストを出力）
+          for line in text.splitlines():
+              if '今月' in line or '回目' in line or '回ログイン' in line:
+                  print(f"DEBUG: {line.strip()[:120]}")
+
+          m = re.search(r'今月[^\d]*(\d+)[^\d]*回', text)
           login_count = m.group(1) if m else "?"
           print(f"Login count this month: {login_count}")
 
