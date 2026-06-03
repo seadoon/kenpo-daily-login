@@ -1,0 +1,55 @@
+name: Daily Kenpo Login
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 毎日 10:00 JST (01:00 UTC)
+  workflow_dispatch:       # 手動実行も可能
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Kenpo portal
+        env:
+          KENPO_NO: ${{ secrets.KENPO_NO }}
+          KENPO_ID: ${{ secrets.KENPO_ID }}
+          KENPO_PWD: ${{ secrets.KENPO_PWD }}
+        run: |
+          BASE_URL="https://dk.kenpo.gr.jp/portal"
+
+          # セッションクッキーを取得
+          COOKIE_JAR=$(mktemp)
+          curl -s -c "$COOKIE_JAR" "$BASE_URL/login.asp" -o /dev/null
+
+          # ログイン POST
+          RESPONSE=$(curl -s -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+            -X POST "$BASE_URL/auth.asp" \
+            --data-urlencode "NO=${KENPO_NO}" \
+            --data-urlencode "ID=${KENPO_ID}" \
+            --data-urlencode "PWD=${KENPO_PWD}" \
+            -d "login=%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3" \
+            -L \
+            -o /dev/null \
+            -w "%{http_code} %{url_effective}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | awk '{print $1}')
+          FINAL_URL=$(echo "$RESPONSE" | awk '{print $2}')
+
+          echo "HTTP status: $HTTP_CODE"
+          echo "Final URL: $FINAL_URL"
+
+          # login.asp に戻ってきたらログイン失敗
+          if echo "$FINAL_URL" | grep -q "login.asp"; then
+            echo "::error::Login failed – redirected back to login page"
+            rm -f "$COOKIE_JAR"
+            exit 1
+          fi
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Login failed – HTTP $HTTP_CODE"
+            rm -f "$COOKIE_JAR"
+            exit 1
+          fi
+
+          echo "Login succeeded."
+          rm -f "$COOKIE_JAR"
