@@ -2,14 +2,15 @@ name: Daily Kenpo Login
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # 毎日 10:00 JST (01:00 UTC)
-  workflow_dispatch:       # 手動実行も可能
+    - cron: '45 23 * * *'  # 毎日 08:45 JST (23:45 UTC)
+  workflow_dispatch:         # 手動実行も可能
 
 jobs:
   login:
     runs-on: ubuntu-latest
     steps:
       - name: Login to Kenpo portal
+        id: login
         env:
           KENPO_NO: ${{ secrets.KENPO_NO }}
           KENPO_ID: ${{ secrets.KENPO_ID }}
@@ -42,7 +43,7 @@ jobs:
           print(f"HTTP status: {resp.status_code}")
           print(f"Final URL:   {resp.url}")
 
-          # エラーメッセージをページから抽出（認証情報確認用）
+          # エラーメッセージをページから抽出
           text = resp.content.decode("shift-jis", errors="replace")
           error_matches = re.findall(r'(?:エラー|error|失敗|invalid|incorrect|wrong)[^\n<]{0,80}', text, re.IGNORECASE)
           for m in error_matches[:5]:
@@ -58,3 +59,37 @@ jobs:
 
           print("Login succeeded.")
           EOF
+
+      - name: Notify Discord (success)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "✅ けんぽポータル ログイン成功",
+                "description": "毎月10回ログインで100ptの自動ログインが完了しました。",
+                "color": 3066993,
+                "footer": { "text": "DK健保組合ポータル" },
+                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+              }]
+            }'
+
+      - name: Notify Discord (failure)
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "❌ けんぽポータル ログイン失敗",
+                "description": "自動ログインに失敗しました。認証情報を確認してください。\n[Actions ログを確認](https://github.com/seadoon/kenpo-daily-login/actions)",
+                "color": 15158332,
+                "footer": { "text": "DK健保組合ポータル" },
+                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+              }]
+            }'
