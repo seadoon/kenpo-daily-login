@@ -15,41 +15,34 @@ jobs:
           KENPO_ID: ${{ secrets.KENPO_ID }}
           KENPO_PWD: ${{ secrets.KENPO_PWD }}
         run: |
-          BASE_URL="https://dk.kenpo.gr.jp/portal"
+          python3 - <<'EOF'
+          import os, sys
+          import requests
+
+          base_url = "https://dk.kenpo.gr.jp/portal"
+          session = requests.Session()
 
           # セッションクッキーを取得
-          COOKIE_JAR=$(mktemp)
-          curl -s -c "$COOKIE_JAR" "$BASE_URL/login.asp" -o /dev/null
+          session.get(f"{base_url}/login.asp")
 
           # ログイン POST
-          RESPONSE=$(curl -s -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-            -X POST "$BASE_URL/auth.asp" \
-            --data-urlencode "NO=${KENPO_NO}" \
-            --data-urlencode "ID=${KENPO_ID}" \
-            --data-urlencode "PWD=${KENPO_PWD}" \
-            --data-urlencode "login=ログイン" \
-            -L \
-            -o /dev/null \
-            -w "%{http_code} %{url_effective}")
+          resp = session.post(f"{base_url}/auth.asp", data={
+              "NO":    os.environ["KENPO_NO"],
+              "ID":    os.environ["KENPO_ID"],
+              "PWD":   os.environ["KENPO_PWD"],
+              "login": "ログイン",
+          }, allow_redirects=True)
 
-          HTTP_CODE=$(echo "$RESPONSE" | awk '{print $1}')
-          FINAL_URL=$(echo "$RESPONSE" | awk '{print $2}')
+          print(f"HTTP status: {resp.status_code}")
+          print(f"Final URL:   {resp.url}")
 
-          echo "HTTP status: $HTTP_CODE"
-          echo "Final URL: $FINAL_URL"
+          if "login.asp" in resp.url:
+              print("::error::Login failed – redirected back to login page")
+              sys.exit(1)
 
-          # login.asp に戻ってきたらログイン失敗
-          if echo "$FINAL_URL" | grep -q "login.asp"; then
-            echo "::error::Login failed – redirected back to login page"
-            rm -f "$COOKIE_JAR"
-            exit 1
-          fi
+          if resp.status_code != 200:
+              print(f"::error::Login failed – HTTP {resp.status_code}")
+              sys.exit(1)
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Login failed – HTTP $HTTP_CODE"
-            rm -f "$COOKIE_JAR"
-            exit 1
-          fi
-
-          echo "Login succeeded."
-          rm -f "$COOKIE_JAR"
+          print("Login succeeded.")
+          EOF
