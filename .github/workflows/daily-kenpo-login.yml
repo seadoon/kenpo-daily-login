@@ -43,8 +43,9 @@ jobs:
           print(f"HTTP status: {resp.status_code}")
           print(f"Final URL:   {resp.url}")
 
-          # エラーメッセージをページから抽出
           text = resp.content.decode("shift-jis", errors="replace")
+
+          # エラーメッセージをページから抽出
           error_matches = re.findall(r'(?:エラー|error|失敗|invalid|incorrect|wrong)[^\n<]{0,80}', text, re.IGNORECASE)
           for m in error_matches[:5]:
               print(f"Page message: {m.strip()}")
@@ -57,6 +58,15 @@ jobs:
               print(f"::error::Login failed – HTTP {resp.status_code}")
               sys.exit(1)
 
+          # 今月のログイン回数を抽出
+          m = re.search(r'今月ログイン(\d+)回目', text)
+          login_count = m.group(1) if m else "?"
+          print(f"Login count this month: {login_count}")
+
+          # GitHub Actions の出力変数に書き出す
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"login_count={login_count}\n")
+
           print("Login succeeded.")
           EOF
 
@@ -64,18 +74,25 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LOGIN_COUNT: ${{ steps.login.outputs.login_count }}
         run: |
+          if [ "$LOGIN_COUNT" = "?" ]; then
+            COUNT_MSG="今月のログイン回数を取得できませんでした。"
+          else
+            COUNT_MSG="今月 **${LOGIN_COUNT}回目** のログインです。"
+          fi
+
           curl -s -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "✅ けんぽポータル ログイン成功",
-                "description": "毎月10回ログインで100ptの自動ログインが完了しました。",
-                "color": 3066993,
-                "footer": { "text": "DK健保組合ポータル" },
-                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            -d "{
+              \"embeds\": [{
+                \"title\": \"✅ けんぽポータル ログイン成功\",
+                \"description\": \"${COUNT_MSG}\n毎月10回達成で100ptゲット！\",
+                \"color\": 3066993,
+                \"footer\": { \"text\": \"DK健保組合ポータル\" },
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
               }]
-            }'
+            }"
 
       - name: Notify Discord (failure)
         if: failure()
@@ -84,12 +101,12 @@ jobs:
         run: |
           curl -s -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "❌ けんぽポータル ログイン失敗",
-                "description": "自動ログインに失敗しました。認証情報を確認してください。\n[Actions ログを確認](https://github.com/seadoon/kenpo-daily-login/actions)",
-                "color": 15158332,
-                "footer": { "text": "DK健保組合ポータル" },
-                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            -d "{
+              \"embeds\": [{
+                \"title\": \"❌ けんぽポータル ログイン失敗\",
+                \"description\": \"自動ログインに失敗しました。認証情報を確認してください。\n[Actions ログを確認](https://github.com/seadoon/kenpo-daily-login/actions)\",
+                \"color\": 15158332,
+                \"footer\": { \"text\": \"DK健保組合ポータル\" },
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
               }]
-            }'
+            }"
