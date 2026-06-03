@@ -49,12 +49,12 @@ Discord Webhook URL の取得方法: チャンネル設定 → 連携サービ�
 
 ## スケジュール
 
-毎日 **8:45 JST**（UTC 23:45）に自動実行されます。
+**2日に1回** 8:45 JST（UTC 23:45）に自動実行されます。月約15回実行されるので、10回の条件を余裕でクリアします。
 
 変更したい場合は `.github/workflows/daily-kenpo-login.yml` の `cron` を編集してください。
 
 ```yaml
-- cron: '45 23 * * *'  # 23:45 UTC = 08:45 JST
+- cron: '45 23 */2 * *'  # 23:45 UTC = 08:45 JST（2日に1回）
 ```
 
 [crontab.guru](https://crontab.guru/) で時刻を確認できます。

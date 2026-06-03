@@ -2,7 +2,7 @@ name: Daily Kenpo Login
 
 on:
   schedule:
-    - cron: '45 23 * * *'  # 毎日 08:45 JST (23:45 UTC)
+    - cron: '45 23 */2 * *'  # 2日に1回 08:45 JST (23:45 UTC)
   workflow_dispatch:         # 手動実行も可能
 
 jobs:
